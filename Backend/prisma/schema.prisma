@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String   @id @unique
+  name          String
+  email         String   @unique
+  role          Role
+  organizationDetails OrganizationDetails?  
+  studentDetails      StudentDetails?       
+  fundraisers   Fundraiser[]  @relation("UserFundraisers")
+  donations     Donation[]    @relation("UserDonations")
+  scholarships  Scholarship[] @relation("UserScholarships")
+  applications  Application[] @relation("UserApplications")
+  disbursements Disbursement[] @relation("UserDisbursements")
+  createdAt     DateTime @default(now())
+  @@index([role])
+  @@index([id])
+  Payment Payment[]
+}
+
+enum Role {
+  STUDENT
+  ORGANIZATION
+   DONOR
+  ADMIN
+}
+
+model OrganizationDetails {
+  id             String  @id @default(uuid())
+  userId         String  @unique  
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  organizationName String
+  registrationNumber String
+  contactPerson  String
+  contactEmail   String
+  contactNumber  String
+  address        String
+  websiteURL     String?
+  
+  documentURL    String  
+  verified       Boolean @default(false)  
+  verifiedAt     DateTime?  
+  createdAt      DateTime @default(now())
+  @@index([userId])
+  @@index([id])
+}
+
+model StudentDetails {
+  id                String   @id @default(uuid())
+  userId            String   @unique 
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName          String   @default("")
+  dateOfBirth       DateTime @default(now())
+  gender            String   @default("Not Specified")
+  nationality       String   @default("Not Specified")
+  contactNumber     String   @default("")
+  address           String   @default("")
+  fatherName        String
+  motherName        String
+  guardianName      String   @default("")
+  guardianContact   String   @default("")
+  aboutMe           String   @default("")
+  tenthResult       String
+  twelfthResult     String
+  incomeCert        String
+  domicileCert      String
+  verified          Boolean  @default(false)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  @@index([userId])
+  @@index([id])
+}
+
+model Fundraiser {
+  id           String   @id @default(uuid())
+  title        String
+  description  String
+  imageUrl     String
+  about        String
+  goalAmount   Float
+  raisedAmount Float    @default(0)
+  deadline     DateTime
+  status       FundraiserStatus @default(PENDING)
+  organizationId String
+  organization  User   @relation("UserFundraisers", fields: [organizationId], references: [id], onDelete: Restrict)
+  donations     Donation[]  @relation("FundraiserDonations")
+  scholarships  Scholarship[] @relation("FundraiserScholarships")
+  createdAt    DateTime @default(now())
+
+  Payment Payment[]
+}
+
+enum FundraiserStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+}
+
+model Donation {
+  id           String   @id @default(uuid())
+  donorId      String
+  donor        User     @relation("UserDonations", fields: [donorId], references: [id], onDelete: Cascade)
+  fundraiserId String
+  fundraiser   Fundraiser @relation("FundraiserDonations", fields: [fundraiserId], references: [id], onDelete: Cascade  )
+  amount       Float
+  createdAt    DateTime @default(now())
+
+  paymentId    String?   @unique
+  payment      Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+}
+
+model Scholarship {
+  id            String   @id @default(uuid())
+  title         String
+  description   String
+  totalAmount   Float
+  allocatedAmount Float @default(0)
+  fundraiserId  String?
+  fundraiser    Fundraiser? @relation("FundraiserScholarships", fields: [fundraiserId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization  User @relation("UserScholarships", fields: [organizationId], references: [id], onDelete: Cascade)
+  applications  Application[] @relation("ScholarshipApplications")
+  disbursements Disbursement[] @relation("ScholarshipDisbursements")
+  StudentRanking StudentRanking[]
+  maxFamilyIncome  Float   @default(0)  
+  expiredAt        DateTime 
+  createdAt     DateTime @default(now())
+  @@index([id])
+  @@index([organizationId])
+  @@index([fundraiserId])
+}
+
+model Application {
+  id           String   @id @default(uuid())
+  studentId    String
+  student      User     @relation("UserApplications", fields: [studentId], references: [id], onDelete: Cascade)
+  scholarshipId String
+  scholarship  Scholarship @relation("ScholarshipApplications", fields: [scholarshipId], references: [id], onDelete: Cascade)
+  scholarshipReason String 
+  otherScholarships Boolean  @default(false)
+  status       ApplicationStatus @default(PENDING)
+  createdAt    DateTime @default(now())
+  StudentRanking StudentRanking[]
+  @@index([id])
+  @@index([studentId])
+  @@index([scholarshipId])
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model Disbursement {
+  id             String   @id @default(uuid())
+  scholarshipId  String
+  scholarship    Scholarship @relation("ScholarshipDisbursements", fields: [scholarshipId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        User @relation("UserDisbursements", fields: [studentId], references: [id], onDelete: Cascade)
+  amount         Float
+  status         DisbursementStatus @default(PENDING)
+  createdAt      DateTime @default(now())
+  @@index([id])
+  @@index([scholarshipId])
+  @@index([studentId])
+}
+
+enum DisbursementStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model StudentRanking {
+  id            String   @id @default(uuid())
+  applicationId String   @unique 
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  scholarshipId String 
+  scholarship   Scholarship @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+  score         Float    @default(0) 
+  rank          Int?     
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  razorpayPaymentId String  @unique
+  razorpayOrderId   String
+  razorpaySignature String
+  amount           Float
+  currency         String  @default("INR")
+  status           PaymentStatus @default(PENDING)
+  donorId          String
+  donor            User    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  fundraiserId     String
+  fundraiser       Fundraiser @relation(fields: [fundraiserId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+
+  @@index([razorpayPaymentId])
+  @@index([donorId])
+  @@index([fundraiserId])
+  Donation Donation[]
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
